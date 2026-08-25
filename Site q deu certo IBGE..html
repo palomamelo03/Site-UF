@@ -1,0 +1,2153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌎 GeoCadastro IBGE</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* ===== RESET E VARIÁVEIS ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #f4f6fa;
+            --bg-card: #ffffff;
+            --text: #1a2332;
+            --text-secondary: #3a4a5a;
+            --border: #dce2ec;
+            --shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+            --radius: 18px;
+            --primary: #2c3e8f;
+            --primary-light: #4a6ab5;
+            --primary-dark: #1a2a6a;
+            --secondary: #7c5cbf;
+            --accent: #3bb08b;
+            --danger: #c0392b;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --sidebar-width: 240px;
+            --transition: 0.25s ease;
+            --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        .dark {
+            --bg: #121825;
+            --bg-card: #1e283a;
+            --text: #e8edf5;
+            --text-secondary: #b0c0d0;
+            --border: #2a3a4a;
+            --shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            --primary: #5a7ac0;
+            --primary-light: #7a9adf;
+            --primary-dark: #3a5a9f;
+        }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            transition: background var(--transition), color var(--transition);
+            display: flex;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        /* ===== SIDEBAR ===== */
+        #sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            padding: 24px 0 16px;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background var(--transition), border var(--transition);
+            z-index: 1000;
+            overflow-y: auto;
+            box-shadow: 2px 0 16px rgba(0,0,0,0.04);
+        }
+        #sidebar .logo {
+            font-size: 1.4rem;
+            font-weight: 700;
+            padding: 0 24px 20px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s;
+        }
+        #sidebar .logo:hover { transform: scale(1.02); }
+        #sidebar nav {
+            flex: 1;
+            padding: 16px 0;
+        }
+        #sidebar nav a {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 24px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: 0.15s;
+            border-left: 3px solid transparent;
+        }
+        #sidebar nav a:hover {
+            background: var(--border);
+            color: var(--text);
+            transform: translateX(4px);
+        }
+        #sidebar nav a.active {
+            background: var(--primary);
+            color: #fff;
+            border-left-color: var(--secondary);
+            border-radius: 0 20px 20px 0;
+        }
+        #sidebar nav a .icon {
+            font-size: 1.3rem;
+            width: 28px;
+            text-align: center;
+        }
+        #sidebar .theme-toggle {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--border);
+            border-radius: 40px;
+            transition: 0.2s;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+        .dark .switch { background: var(--primary); }
+        .dark .switch::after { left: 23px; }
+
+        /* ===== MAIN CONTENT ===== */
+        #main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 28px 32px 40px;
+            transition: margin 0.3s ease;
+        }
+        .page {
+            display: none;
+            animation: fadeUp 0.4s ease;
+        }
+        .page.active { display: block; }
+        @keyframes fadeUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text);
+        }
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 22px 24px;
+            border: 1px solid var(--border);
+            transition: background var(--transition), border var(--transition), transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 20px;
+            animation: cardPop 0.5s ease both;
+        }
+        .card:hover { box-shadow: 0 12px 32px rgba(0,0,0,0.06); }
+        @keyframes cardPop {
+            0% { opacity: 0; transform: scale(0.96); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* ===== DASHBOARD ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 18px 16px;
+            border: 1px solid var(--border);
+            text-align: center;
+            box-shadow: var(--shadow);
+            transition: all 0.25s ease;
+            animation: statPop 0.6s ease both;
+        }
+        .stat-card .icon { font-size: 2rem; }
+        .stat-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            transition: all 0.3s;
+        }
+        .stat-card .label { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; }
+        .stat-card:hover {
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+        }
+        @keyframes statPop {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* ===== RANKING ===== */
+        .ranking-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 12px 0;
+        }
+        .ranking-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 16px;
+            background: var(--bg);
+            border-radius: 40px;
+            border: 1px solid var(--border);
+            transition: 0.2s;
+        }
+        .ranking-item:hover { background: var(--border); }
+        .ranking-item .pos { font-weight: 700; font-size: 1.1rem; min-width: 36px; color: var(--primary); }
+        .ranking-item .name { flex: 1; font-weight: 500; }
+        .ranking-item .count {
+            background: var(--primary);
+            color: #fff;
+            padding: 2px 14px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        /* ===== FORMULÁRIOS ===== */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px 20px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .form-group label {
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--text-secondary);
+        }
+        .form-group input, .form-group select {
+            padding: 10px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            background: var(--bg);
+            color: var(--text);
+            transition: 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(44, 62, 143, 0.12);
+        }
+
+        /* ===== BOTÕES ===== */
+        .btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--border);
+            color: var(--text);
+            text-decoration: none;
+        }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-success:hover { background: #1e7b4a; }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #a93226; }
+        .btn-secondary { background: var(--text-secondary); color: #fff; }
+        .btn-secondary:hover { background: #2a3a4a; }
+        .btn-sm { padding: 4px 14px; font-size: 0.8rem; }
+        .btn-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+
+        /* ===== TABELAS ===== */
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 440px;
+            overflow-y: auto;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        table th {
+            background: var(--primary);
+            color: #fff;
+            padding: 12px 10px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            font-weight: 600;
+        }
+        table td { padding: 10px 10px; border-bottom: 1px solid var(--border); }
+        table tr:hover { background: rgba(44, 62, 143, 0.04); }
+
+        /* ===== MAPA ===== */
+        .map-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+            aspect-ratio: 1/1.1;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            padding: 20px;
+        }
+        .map-bg {
+            position: absolute;
+            inset: 0;
+            opacity: 0.06;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 110"><path d="M20,10 L80,10 L90,30 L95,50 L90,70 L75,90 L50,100 L25,95 L10,80 L5,55 L10,30 Z" fill="none" stroke="%232c3e8f" stroke-width="2"/></svg>') center/70% no-repeat;
+            pointer-events: none;
+        }
+        .map-grid {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .estado-btn {
+            position: absolute;
+            padding: 4px 6px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            min-width: 28px;
+            text-align: center;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .estado-btn:hover {
+            transform: translate(-50%, -50%) scale(1.2) !important;
+            background: var(--secondary);
+            z-index: 10;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.2);
+        }
+        .estado-btn .tooltip {
+            display: none;
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-card);
+            color: var(--text);
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            white-space: nowrap;
+            font-weight: 400;
+            font-size: 0.8rem;
+            border: 1px solid var(--border);
+            z-index: 20;
+            min-width: 160px;
+        }
+        .estado-btn:hover .tooltip { display: block; }
+        .estado-btn .tooltip strong { display: block; font-size: 1rem; }
+
+        /* ===== HIERARQUIA ===== */
+        .tree { font-size: 0.95rem; line-height: 1.8; }
+        .tree ul {
+            list-style: none;
+            padding-left: 24px;
+            border-left: 2px solid var(--border);
+            margin-left: 8px;
+        }
+        .tree li {
+            position: relative;
+            padding: 2px 0;
+        }
+        .tree li::before {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 12px;
+            width: 10px;
+            height: 2px;
+            background: var(--border);
+        }
+        .tree .node {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px 4px 8px;
+            border-radius: 30px;
+            transition: 0.15s;
+            cursor: default;
+        }
+        .tree .node:hover { background: var(--border); }
+        .tree .node .badge {
+            font-size: 0.7rem;
+            background: var(--primary);
+            color: #fff;
+            border-radius: 40px;
+            padding: 0 10px;
+            line-height: 20px;
+        }
+
+        /* ===== TOAST ===== */
+        .toast-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 9999;
+        }
+        .toast {
+            background: var(--bg-card);
+            color: var(--text);
+            padding: 14px 24px;
+            border-radius: 40px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+            font-weight: 500;
+            border: 1px solid var(--border);
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+        .toast.success { border-left: 5px solid var(--success); }
+        .toast.error { border-left: 5px solid var(--danger); }
+        @keyframes slideIn {
+            0% { opacity: 0; transform: translateX(40px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ===== DROP ZONE ===== */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 40px 20px;
+            text-align: center;
+            background: var(--bg);
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary);
+            background: var(--bg-card);
+        }
+        .drop-zone .icon { font-size: 3rem; }
+
+        /* ===== MODAL PERFIL ===== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            animation: fadeIn 0.2s ease;
+        }
+        .modal-overlay.show { display: flex; }
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        .modal {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 24px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            0% { transform: translateY(30px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .modal-header h3 { margin: 0; }
+        .modal-close {
+            font-size: 1.6rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: 0.2s;
+            line-height: 1;
+        }
+        .modal-close:hover { color: var(--text); transform: rotate(90deg); }
+        .modal-body .form-group { margin-bottom: 14px; }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        /* ===== EASTER EGG ===== */
+        .egg-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-card);
+            padding: 40px 60px;
+            border-radius: 40px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+            z-index: 99999;
+            text-align: center;
+            border: 2px solid var(--primary);
+            animation: eggPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: none;
+        }
+        .egg-container.show { display: block; }
+        @keyframes eggPop {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+        .egg-container .close-egg {
+            position: absolute;
+            top: 12px;
+            right: 20px;
+            font-size: 1.8rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+        .egg-container .close-egg:hover { color: var(--text); }
+
+        /* ===== RESPONSIVIDADE ===== */
+        @media (max-width: 1024px) {
+            :root { --sidebar-width: 200px; }
+            #main-content { padding: 20px 18px; }
+        }
+        @media (max-width: 768px) {
+            #sidebar { transform: translateX(-100%); width: 260px; }
+            #sidebar.open { transform: translateX(0); }
+            #main-content { margin-left: 0; padding: 16px; }
+            .hamburger { display: flex !important; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .form-grid { grid-template-columns: 1fr; }
+            .map-container { max-width: 100%; aspect-ratio: 1/1.2; }
+            .estado-btn { font-size: 0.5rem; padding: 2px 4px; min-width: 20px; }
+            .egg-container { padding: 30px; width: 90%; }
+        }
+        @media (max-width: 480px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .toast { max-width: 90%; font-size: 0.85rem; }
+            .estado-btn { font-size: 0.45rem; padding: 2px 3px; min-width: 16px; }
+        }
+        .hamburger {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.8rem;
+            color: var(--text);
+            cursor: pointer;
+            padding: 8px;
+            margin-bottom: 12px;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 999;
+        }
+        .overlay.show { display: block; }
+
+        .flex { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        .mt-2 { margin-top: 16px; }
+        .mb-2 { margin-bottom: 16px; }
+        .text-muted { color: var(--text-secondary); font-size: 0.9rem; }
+        .search-box {
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.9rem;
+            min-width: 180px;
+        }
+        .search-box:focus { outline: none; border-color: var(--primary); }
+
+        .bar-chart { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+        .bar-row { display: flex; align-items: center; gap: 12px; }
+        .bar-label { width: 80px; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-align: right; }
+        .bar-track { flex: 1; height: 24px; background: var(--border); border-radius: 40px; overflow: hidden; }
+        .bar-fill {
+            height: 100%;
+            border-radius: 40px;
+            background: linear-gradient(90deg, var(--primary-light), var(--primary));
+            transition: width 0.8s ease;
+            width: 0%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 600;
+            min-width: 30px;
+        }
+        .donut-container { display: flex; flex-wrap: wrap; gap: 30px; align-items: center; justify-content: center; margin: 20px 0; }
+        .donut { width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#2e86c1 0% 0%, #27ae60 0% 0%, #f39c12 0% 0%, #8e44ad 0% 0%, #e67e22 0% 0%); box-shadow: 0 4px 16px rgba(0,0,0,0.05); transition: all 0.3s; }
+        .donut-legend { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; }
+        .donut-legend-item { display: flex; align-items: center; gap: 10px; }
+        .donut-legend-color { width: 18px; height: 18px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <!-- OVERLAY (mobile) -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- EASTER EGG -->
+    <div class="egg-container" id="eggContainer">
+        <span class="close-egg" id="closeEgg">✕</span>
+        <div style="font-size:4rem;">🌎</div>
+        <h2 style="margin:16px 0 8px;">🎉 Você encontrou o modo secreto!</h2>
+        <p style="color:var(--text-secondary);">GeoCadastro — Versão Ultra</p>
+        <div style="margin-top:16px; font-size:2rem;">✨🚀🔥</div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+        <div class="logo" id="logoEgg">🌎 GeoCadastro</div>
+        <nav>
+            <a href="#" data-page="dashboard" class="active"><span class="icon">🏠</span> Dashboard</a>
+            <a href="#" data-page="cadastro"><span class="icon">➕</span> Novo Cadastro</a>
+            <a href="#" data-page="listagem"><span class="icon">📋</span> Cadastros</a>
+            <a href="#" data-page="mapa"><span class="icon">🗺️</span> Mapa</a>
+            <a href="#" data-page="hierarquia"><span class="icon">🌳</span> Hierarquia</a>
+            <a href="#" data-page="exportar"><span class="icon">📤</span> Exportar</a>
+            <a href="#" data-page="relatorios"><span class="icon">📑</span> Relatórios</a>
+            <a href="#" data-page="configuracoes"><span class="icon">⚙️</span> Configurações</a>
+        </nav>
+        <div class="theme-toggle" id="themeToggle">
+            <span>🌙 <span id="themeLabel">Escuro</span></span>
+            <div class="switch" id="switchBtn"></div>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main id="main-content">
+        <button class="hamburger" id="hamburger">☰</button>
+
+        <!-- ===== DASHBOARD ===== -->
+        <section id="page-dashboard" class="page active">
+            <h2>📊 Dashboard IBGE</h2>
+            <div class="stats-grid" id="statsGrid"></div>
+            <div class="card">
+                <h3 style="margin-bottom:12px;">🏆 Ranking de Estados com mais Cadastros</h3>
+                <div id="rankingContainer" class="ranking-list"></div>
+            </div>
+            <div class="card">
+                <h3 style="margin-bottom:12px;">📈 Distribuição de Pessoas por Estado</h3>
+                <div id="distribuicaoEstado" class="bar-chart"></div>
+            </div>
+            <div class="card">
+                <h3 style="margin-bottom:12px;">💰 Renda Média por Estado</h3>
+                <div id="rendaEstado" class="bar-chart"></div>
+            </div>
+            <div class="card">
+                <h3 style="margin-bottom:12px;">👥 Faixa Etária</h3>
+                <div id="faixaEtaria" class="donut-container"></div>
+            </div>
+            <div class="card">
+                <h3 style="margin-bottom:12px;">📋 Últimos cadastros</h3>
+                <div id="ultimosCadastros" class="text-muted"></div>
+            </div>
+        </section>
+
+        <!-- ===== CADASTRO ===== -->
+        <section id="page-cadastro" class="page">
+            <h2>➕ Novo Cadastro</h2>
+            <!-- UF -->
+            <div class="card">
+                <h3 style="margin-bottom:16px;">🌎 Estado (UF)</h3>
+                <div class="form-grid" id="formEstado">
+                    <div class="form-group"><label>Sigla</label><input type="text" id="uf-sigla" placeholder="ex: SP" maxlength="2"></div>
+                    <div class="form-group"><label>Nome</label><input type="text" id="uf-nome" placeholder="São Paulo"></div>
+                    <div class="form-group"><label>Região</label>
+                        <select id="uf-regiao"><option value="">Selecione</option><option>Norte</option><option>Nordeste</option><option>Centro-Oeste</option><option>Sudeste</option><option>Sul</option></select>
+                    </div>
+                    <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-success" id="btnSalvarUF">Salvar UF</button></div>
+                </div>
+            </div>
+            <!-- Município -->
+            <div class="card">
+                <h3 style="margin-bottom:16px;">🏙️ Município</h3>
+                <div class="form-grid" id="formMunicipio">
+                    <div class="form-group"><label>UF</label><select id="mun-uf"></select></div>
+                    <div class="form-group"><label>Nome</label><input type="text" id="mun-nome" placeholder="Campinas"></div>
+                    <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-success" id="btnSalvarMunicipio">Salvar Município</button></div>
+                </div>
+            </div>
+            <!-- Bairro -->
+            <div class="card">
+                <h3 style="margin-bottom:16px;">🏘️ Bairro</h3>
+                <div class="form-grid" id="formBairro">
+                    <div class="form-group"><label>UF</label><select id="bairro-uf"></select></div>
+                    <div class="form-group"><label>Município</label><select id="bairro-mun"></select></div>
+                    <div class="form-group"><label>Nome</label><input type="text" id="bairro-nome" placeholder="Centro"></div>
+                    <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-success" id="btnSalvarBairro">Salvar Bairro</button></div>
+                </div>
+            </div>
+            <!-- Pessoa -->
+            <div class="card">
+                <h3 style="margin-bottom:16px;">👤 Pessoa</h3>
+                <div class="form-grid" id="formPessoa">
+                    <div class="form-group"><label>Nome Completo</label><input type="text" id="pessoa-nome" placeholder="Nome"></div>
+                    <div class="form-group"><label>CPF</label><input type="text" id="pessoa-cpf" placeholder="000.000.000-00"></div>
+                    <div class="form-group"><label>E-mail</label><input type="email" id="pessoa-email" placeholder="email@exemplo.com"></div>
+                    <div class="form-group"><label>Sexo</label>
+                        <select id="pessoa-sexo"><option value="">Selecione</option><option>Masculino</option><option>Feminino</option><option>Outro</option></select>
+                    </div>
+                    <div class="form-group"><label>Data Nasc.</label><input type="date" id="pessoa-nascimento"></div>
+                    <div class="form-group"><label>Renda (R$)</label><input type="number" step="0.01" id="pessoa-renda" placeholder="0.00"></div>
+                    <div class="form-group"><label>UF</label><select id="pessoa-uf"></select></div>
+                    <div class="form-group"><label>Município</label><select id="pessoa-mun"></select></div>
+                    <div class="form-group"><label>Bairro</label><select id="pessoa-bairro"></select></div>
+                    <div class="form-group"><label>Logradouro</label><input type="text" id="pessoa-logradouro" placeholder="Rua, Av..."></div>
+                    <div class="form-group"><label>Número</label><input type="text" id="pessoa-numero" placeholder="123"></div>
+                    <div class="form-group"><label>Complemento</label><input type="text" id="pessoa-complemento" placeholder="Apto, Bloco..."></div>
+                    <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-success" id="btnSalvarPessoa">Salvar Pessoa</button></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== LISTAGEM ===== -->
+        <section id="page-listagem" class="page">
+            <h2>📋 Cadastros</h2>
+            <div class="flex mb-2">
+                <input type="text" class="search-box" id="searchInput" placeholder="🔍 Pesquisar...">
+                <select id="filterTipo" class="search-box" style="min-width:140px;">
+                    <option value="todos">Todos</option>
+                    <option value="uf">UF</option>
+                    <option value="municipio">Município</option>
+                    <option value="bairro">Bairro</option>
+                    <option value="pessoa">Pessoa</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" id="btnListarTodos">Listar Todos</button>
+            </div>
+            <div class="card">
+                <div class="table-wrapper" id="tabelaContainer"></div>
+            </div>
+        </section>
+
+        <!-- ===== MAPA ===== -->
+        <section id="page-mapa" class="page">
+            <h2>🗺️ Mapa do Brasil</h2>
+            <div class="card">
+                <div class="map-container">
+                    <div class="map-bg"></div>
+                    <div class="map-grid" id="mapGrid"></div>
+                </div>
+                <div id="mapInfo" class="text-muted mt-2" style="text-align:center;">Clique em um estado para ver detalhes</div>
+            </div>
+        </section>
+
+        <!-- ===== HIERARQUIA ===== -->
+        <section id="page-hierarquia" class="page">
+            <h2>🌳 Visualização Hierárquica</h2>
+            <div class="card">
+                <div id="treeContainer" class="tree"></div>
+            </div>
+        </section>
+
+        <!-- ===== EXPORTAR ===== -->
+        <section id="page-exportar" class="page">
+            <h2>📤 Central de Exportação</h2>
+            <div class="card">
+                <h3>📊 Exportar dados</h3>
+                <div class="form-grid" style="margin-bottom:16px;">
+                    <div class="form-group"><label>UF</label><select id="exp-uf"><option value="">Todas</option></select></div>
+                    <div class="form-group"><label>Município</label><select id="exp-mun"><option value="">Todos</option></select></div>
+                    <div class="form-group"><label>Bairro</label><select id="exp-bairro"><option value="">Todos</option></select></div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success" id="expExcel">📊 Excel</button>
+                    <button class="btn btn-danger" id="expPDF">📄 PDF</button>
+                    <button class="btn btn-primary" id="expCSV">📑 CSV</button>
+                    <button class="btn btn-warning" id="expJSON">🔗 JSON</button>
+                    <button class="btn btn-secondary" id="expPrint">🖨️ Imprimir</button>
+                </div>
+                <p class="text-muted" style="margin-top:8px;">Os dados serão filtrados pelos campos acima.</p>
+            </div>
+            <div class="card">
+                <h3>📥 Importação de dados</h3>
+                <div class="drop-zone" id="dropZone">
+                    <div class="icon">📂</div>
+                    <p><strong>Arraste seu arquivo Excel (.xlsx), CSV ou JSON aqui</strong></p>
+                    <p class="text-muted">ou clique para selecionar</p>
+                    <input type="file" id="fileInput" accept=".xlsx,.csv,.json" style="display:none;">
+                </div>
+                <div id="importPreview" class="mt-2"></div>
+                <button class="btn btn-success" id="btnImportar" style="display:none;">✅ Importar</button>
+            </div>
+        </section>
+
+        <!-- ===== RELATÓRIOS ===== -->
+        <section id="page-relatorios" class="page">
+            <h2>📑 Relatórios Automáticos</h2>
+            <div class="card">
+                <h3>Gerar relatório em PDF</h3>
+                <div class="btn-group">
+                    <button class="btn btn-primary" data-rel="geral">📄 Relatório Geral</button>
+                    <button class="btn btn-primary" data-rel="uf">📄 Relatório por UF</button>
+                    <button class="btn btn-primary" data-rel="municipio">📄 Relatório por Município</button>
+                    <button class="btn btn-primary" data-rel="bairro">📄 Relatório por Bairro</button>
+                    <button class="btn btn-primary" data-rel="demografico">📄 Relatório Demográfico</button>
+                    <button class="btn btn-primary" data-rel="renda">📄 Relatório de Renda</button>
+                    <button class="btn btn-primary" data-rel="mensal">📄 Relatório Mensal</button>
+                </div>
+                <p class="text-muted mt-2">Clique em um botão para gerar o PDF correspondente.</p>
+            </div>
+        </section>
+
+        <!-- ===== CONFIGURAÇÕES ===== -->
+        <section id="page-configuracoes" class="page">
+            <h2>⚙️ Configurações</h2>
+            <div class="card">
+                <h3>🌙 Tema</h3>
+                <div class="flex">
+                    <button class="btn btn-primary" id="btnTemaClaro">☀️ Claro</button>
+                    <button class="btn btn-primary" id="btnTemaEscuro">🌙 Escuro</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3>🔔 Notificações</h3>
+                <div class="flex">
+                    <label><input type="checkbox" id="notifCheck" checked> Ativar notificações</label>
+                </div>
+            </div>
+            <div class="card">
+                <h3>👤 Perfil</h3>
+                <p class="text-muted">Usuário: <strong id="perfilNome">Admin</strong></p>
+                <p class="text-muted">Email: <strong id="perfilEmail">admin@geocadastro.com</strong></p>
+                <button class="btn btn-secondary" id="btnEditarPerfil">✏️ Editar perfil</button>
+            </div>
+            <div class="card">
+                <h3>🗃️ Dados</h3>
+                <button class="btn btn-danger" id="btnLimparDados">Limpar todos os dados</button>
+                <button class="btn btn-secondary" id="btnExportarJSON">📥 Exportar JSON</button>
+                <button class="btn btn-secondary" id="btnImportarJSON">📤 Importar JSON</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL EDITAR PERFIL -->
+    <div class="modal-overlay" id="modalPerfil">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✏️ Editar Perfil</h3>
+                <span class="modal-close" id="modalPerfilClose">✕</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nome</label>
+                    <input type="text" id="perfilEditNome" value="Admin">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="perfilEditEmail" value="admin@geocadastro.com">
+                </div>
+                <div class="form-group">
+                    <label>Senha (deixe em branco para manter)</label>
+                    <input type="password" id="perfilEditSenha" placeholder="Nova senha">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modalPerfilCancel">Cancelar</button>
+                <button class="btn btn-success" id="modalPerfilSave">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ============================================================
+        //  GERENCIADOR DE DADOS (localStorage)
+        // ============================================================
+        const DB = {
+            get(key) {
+                try { return JSON.parse(localStorage.getItem(key)) || []; }
+                catch { return []; }
+            },
+            set(key, data) {
+                localStorage.setItem(key, JSON.stringify(data));
+            },
+            getEstados() { return this.get('estados'); },
+            setEstados(e) { this.set('estados', e); },
+            getMunicipios() { return this.get('municipios'); },
+            setMunicipios(m) { this.set('municipios', m); },
+            getBairros() { return this.get('bairros'); },
+            setBairros(b) { this.set('bairros', b); },
+            getPessoas() { return this.get('pessoas'); },
+            setPessoas(p) { this.set('pessoas', p); },
+        };
+
+        // ============================================================
+        //  TOAST
+        // ============================================================
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const el = document.createElement('div');
+            el.className = `toast ${type}`;
+            el.textContent = msg;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.style.opacity = '0';
+                setTimeout(() => el.remove(), 300);
+            }, 3200);
+        }
+
+        // ============================================================
+        //  VALIDAÇÕES
+        // ============================================================
+        function validarUF(sigla, nome) {
+            if (!sigla.trim()) { showToast('❌ Digite a sigla da UF.', 'error'); return false; }
+            if (sigla.length !== 2) { showToast('❌ A sigla deve ter 2 caracteres.', 'error'); return false; }
+            if (!nome.trim()) { showToast('❌ Digite o nome do estado.', 'error'); return false; }
+            const existentes = DB.getEstados();
+            if (existentes.some(e => e.sigla.toUpperCase() === sigla.toUpperCase())) {
+                showToast('❌ Esta UF já está cadastrada.', 'error');
+                return false;
+            }
+            return true;
+        }
+        function validarMunicipio(uf, nome) {
+            if (!uf) { showToast('❌ Selecione uma UF.', 'error'); return false; }
+            if (!nome.trim()) { showToast('❌ Digite o nome do município.', 'error'); return false; }
+            return true;
+        }
+        function validarBairro(uf, munId, nome) {
+            if (!uf) { showToast('❌ Selecione uma UF.', 'error'); return false; }
+            if (!munId) { showToast('❌ Selecione um município.', 'error'); return false; }
+            if (!nome.trim()) { showToast('❌ Digite o nome do bairro.', 'error'); return false; }
+            return true;
+        }
+        function validarPessoa(nome, cpf, uf, munId, bairroId) {
+            if (!nome.trim()) { showToast('❌ Digite o nome da pessoa.', 'error'); return false; }
+            if (!cpf.trim()) { showToast('❌ Digite o CPF.', 'error'); return false; }
+            const pessoas = DB.getPessoas();
+            if (pessoas.some(p => p.cpf === cpf)) {
+                showToast('❌ Este CPF já está cadastrado.', 'error');
+                return false;
+            }
+            if (!uf) { showToast('❌ Selecione a UF.', 'error'); return false; }
+            if (!munId) { showToast('❌ Selecione o município.', 'error'); return false; }
+            if (!bairroId) { showToast('❌ Selecione o bairro.', 'error'); return false; }
+            return true;
+        }
+
+        // ============================================================
+        //  CRUD
+        // ============================================================
+        function salvarUF() {
+            const sigla = document.getElementById('uf-sigla').value.trim().toUpperCase();
+            const nome = document.getElementById('uf-nome').value.trim();
+            const regiao = document.getElementById('uf-regiao').value;
+            if (!validarUF(sigla, nome)) return;
+            const estados = DB.getEstados();
+            estados.push({ sigla, nome, regiao });
+            DB.setEstados(estados);
+            showToast(`✅ UF ${sigla} cadastrada com sucesso!`);
+            document.getElementById('uf-sigla').value = '';
+            document.getElementById('uf-nome').value = '';
+            document.getElementById('uf-regiao').value = '';
+            atualizarTudo();
+        }
+        function salvarMunicipio() {
+            const uf = document.getElementById('mun-uf').value;
+            const nome = document.getElementById('mun-nome').value.trim();
+            if (!validarMunicipio(uf, nome)) return;
+            const municipios = DB.getMunicipios();
+            municipios.push({ id: Date.now(), uf, nome });
+            DB.setMunicipios(municipios);
+            showToast(`✅ Município ${nome} cadastrado!`);
+            document.getElementById('mun-nome').value = '';
+            atualizarTudo();
+        }
+        function salvarBairro() {
+            const uf = document.getElementById('bairro-uf').value;
+            const munId = parseInt(document.getElementById('bairro-mun').value);
+            const nome = document.getElementById('bairro-nome').value.trim();
+            if (!validarBairro(uf, munId, nome)) return;
+            const bairros = DB.getBairros();
+            bairros.push({ id: Date.now(), municipioId: munId, nome });
+            DB.setBairros(bairros);
+            showToast(`✅ Bairro ${nome} cadastrado!`);
+            document.getElementById('bairro-nome').value = '';
+            atualizarTudo();
+        }
+        function salvarPessoa() {
+            const nome = document.getElementById('pessoa-nome').value.trim();
+            const cpf = document.getElementById('pessoa-cpf').value.trim();
+            const email = document.getElementById('pessoa-email').value.trim();
+            const sexo = document.getElementById('pessoa-sexo').value;
+            const nascimento = document.getElementById('pessoa-nascimento').value;
+            const renda = parseFloat(document.getElementById('pessoa-renda').value) || 0;
+            const uf = document.getElementById('pessoa-uf').value;
+            const munId = parseInt(document.getElementById('pessoa-mun').value);
+            const bairroId = parseInt(document.getElementById('pessoa-bairro').value);
+            const logradouro = document.getElementById('pessoa-logradouro').value.trim();
+            const numero = document.getElementById('pessoa-numero').value.trim();
+            const complemento = document.getElementById('pessoa-complemento').value.trim();
+            if (!validarPessoa(nome, cpf, uf, munId, bairroId)) return;
+            const pessoas = DB.getPessoas();
+            pessoas.push({
+                id: Date.now(),
+                nome, cpf, email, sexo, nascimento, renda, uf,
+                municipioId: munId, bairroId, logradouro, numero, complemento,
+                dataCadastro: new Date().toISOString().split('T')[0]
+            });
+            DB.setPessoas(pessoas);
+            showToast(`✅ Pessoa ${nome} cadastrada!`);
+            document.getElementById('pessoa-nome').value = '';
+            document.getElementById('pessoa-cpf').value = '';
+            document.getElementById('pessoa-email').value = '';
+            document.getElementById('pessoa-sexo').value = '';
+            document.getElementById('pessoa-nascimento').value = '';
+            document.getElementById('pessoa-renda').value = '';
+            document.getElementById('pessoa-logradouro').value = '';
+            document.getElementById('pessoa-numero').value = '';
+            document.getElementById('pessoa-complemento').value = '';
+            atualizarTudo();
+        }
+        function excluirItem(tipo, id) {
+            if (!confirm(`Excluir ${tipo}?`)) return;
+            if (tipo === 'uf') {
+                const estados = DB.getEstados().filter(e => e.sigla !== id);
+                DB.setEstados(estados);
+                const muns = DB.getMunicipios().filter(m => m.uf !== id);
+                DB.setMunicipios(muns);
+                const bairros = DB.getBairros().filter(b => {
+                    const mun = DB.getMunicipios().find(m => m.id === b.municipioId);
+                    return mun && mun.uf !== id;
+                });
+                DB.setBairros(bairros);
+                const pessoas = DB.getPessoas().filter(p => p.uf !== id);
+                DB.setPessoas(pessoas);
+            } else if (tipo === 'municipio') {
+                const muns = DB.getMunicipios().filter(m => m.id !== id);
+                DB.setMunicipios(muns);
+                const bairros = DB.getBairros().filter(b => b.municipioId !== id);
+                DB.setBairros(bairros);
+                const pessoas = DB.getPessoas().filter(p => p.municipioId !== id);
+                DB.setPessoas(pessoas);
+            } else if (tipo === 'bairro') {
+                const bairros = DB.getBairros().filter(b => b.id !== id);
+                DB.setBairros(bairros);
+                const pessoas = DB.getPessoas().filter(p => p.bairroId !== id);
+                DB.setPessoas(pessoas);
+            } else if (tipo === 'pessoa') {
+                const pessoas = DB.getPessoas().filter(p => p.id !== id);
+                DB.setPessoas(pessoas);
+            }
+            showToast(`🗑️ ${tipo} excluído.`);
+            atualizarTudo();
+        }
+
+        // ============================================================
+        //  RENDERIZAÇÃO: DASHBOARD
+        // ============================================================
+        function renderDashboard() {
+            const estados = DB.getEstados();
+            const municipios = DB.getMunicipios();
+            const bairros = DB.getBairros();
+            const pessoas = DB.getPessoas();
+
+            const totalPessoas = pessoas.length;
+            const totalLocalidades = estados.length + municipios.length + bairros.length;
+            const hoje = new Date().toISOString().split('T')[0];
+            const cadastrosMes = pessoas.filter(p => p.dataCadastro && p.dataCadastro.startsWith(hoje.substring(0,7))).length;
+            const validos = pessoas.filter(p => p.nome && p.cpf && p.uf && p.municipioId && p.bairroId).length;
+            const pendentes = totalPessoas - validos;
+            const rendaTotal = pessoas.reduce((s, p) => s + p.renda, 0);
+            const rendaMedia = totalPessoas ? rendaTotal / totalPessoas : 0;
+            const maiorRenda = totalPessoas ? Math.max(...pessoas.map(p => p.renda)) : 0;
+            const menorRenda = totalPessoas ? Math.min(...pessoas.map(p => p.renda)) : 0;
+
+            const cards = [
+                { icon: '👥', label: 'Pessoas', value: totalPessoas },
+                { icon: '📍', label: 'Localidades', value: totalLocalidades },
+                { icon: '📈', label: 'Cadastros neste mês', value: cadastrosMes },
+                { icon: '🟢', label: 'Registros válidos', value: validos },
+                { icon: '⚠️', label: 'Registros pendentes', value: pendentes },
+                { icon: '💰', label: 'Renda total', value: 'R$ ' + rendaTotal.toFixed(2).replace('.', ',') },
+                { icon: '📊', label: 'Renda média', value: 'R$ ' + rendaMedia.toFixed(2).replace('.', ',') },
+                { icon: '⬆️', label: 'Maior renda', value: 'R$ ' + maiorRenda.toFixed(2).replace('.', ',') },
+                { icon: '⬇️', label: 'Menor renda', value: 'R$ ' + menorRenda.toFixed(2).replace('.', ',') },
+            ];
+
+            const grid = document.getElementById('statsGrid');
+            grid.innerHTML = cards.map((c, i) => `
+                <div class="stat-card" style="animation-delay:${i * 0.04}s">
+                    <div class="icon">${c.icon}</div>
+                    <div class="value" data-target="${c.value}">0</div>
+                    <div class="label">${c.label}</div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.stat-card .value').forEach(el => {
+                const target = parseFloat(el.dataset.target) || 0;
+                let current = 0;
+                const step = Math.max(1, Math.floor(target / 40));
+                const interval = setInterval(() => {
+                    current += step;
+                    if (current >= target) {
+                        el.textContent = typeof target === 'string' ? target : Math.floor(target);
+                        clearInterval(interval);
+                    } else {
+                        el.textContent = Math.floor(current);
+                    }
+                }, 20);
+            });
+
+            // Ranking
+            const ranking = {};
+            estados.forEach(e => ranking[e.sigla] = 0);
+            pessoas.forEach(p => { if (ranking[p.uf] !== undefined) ranking[p.uf]++; });
+            const sortedRank = Object.entries(ranking).filter(([_, qtd]) => qtd > 0).sort((a, b) => b[1] - a[1]);
+            const medals = ['🥇','🥈','🥉'];
+            const containerRank = document.getElementById('rankingContainer');
+            if (!sortedRank.length) {
+                containerRank.innerHTML = '<p class="text-muted">Nenhuma pessoa cadastrada.</p>';
+            } else {
+                containerRank.innerHTML = sortedRank.slice(0, 5).map(([uf, qtd], i) => `
+                    <div class="ranking-item" style="animation-delay:${i * 0.05}s">
+                        <span class="pos">${i < 3 ? medals[i] : `#${i+1}`}</span>
+                        <span class="name">${uf}</span>
+                        <span class="count">${qtd}</span>
+                    </div>
+                `).join('');
+            }
+
+            // Distribuição por estado
+            const distEstado = {};
+            estados.forEach(e => distEstado[e.sigla] = 0);
+            pessoas.forEach(p => { if (distEstado[p.uf] !== undefined) distEstado[p.uf]++; });
+            const sortedDist = Object.entries(distEstado).filter(([_, qtd]) => qtd > 0).sort((a, b) => b[1] - a[1]);
+            const maxPessoas = sortedDist.length ? Math.max(...sortedDist.map(([_, qtd]) => qtd)) : 1;
+            const containerDist = document.getElementById('distribuicaoEstado');
+            if (!sortedDist.length) {
+                containerDist.innerHTML = '<p class="text-muted">Nenhuma pessoa cadastrada.</p>';
+            } else {
+                containerDist.innerHTML = sortedDist.map(([uf, qtd]) => `
+                    <div class="bar-row">
+                        <span class="bar-label">${uf}</span>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width:${(qtd/maxPessoas)*100}%; background:var(--primary-light);">${qtd}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Renda média por estado
+            const rendaPorEstado = {};
+            estados.forEach(e => rendaPorEstado[e.sigla] = { soma: 0, count: 0 });
+            pessoas.forEach(p => {
+                if (rendaPorEstado[p.uf]) {
+                    rendaPorEstado[p.uf].soma += p.renda;
+                    rendaPorEstado[p.uf].count++;
+                }
+            });
+            const rendaSorted = Object.entries(rendaPorEstado)
+                .filter(([_, data]) => data.count > 0)
+                .map(([uf, data]) => ({ uf, media: data.soma / data.count }))
+                .sort((a, b) => b.media - a.media);
+            const maxRenda = rendaSorted.length ? Math.max(...rendaSorted.map(r => r.media)) : 1;
+            const containerRenda = document.getElementById('rendaEstado');
+            if (!rendaSorted.length) {
+                containerRenda.innerHTML = '<p class="text-muted">Nenhuma pessoa com renda cadastrada.</p>';
+            } else {
+                containerRenda.innerHTML = rendaSorted.map(r => `
+                    <div class="bar-row">
+                        <span class="bar-label">${r.uf}</span>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width:${(r.media/maxRenda)*100}%; background:var(--secondary);">R$ ${r.media.toFixed(2)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Faixa etária
+            const faixas = { '0-18': 0, '19-30': 0, '31-50': 0, '51-70': 0, '70+': 0 };
+            const hojeDate = new Date();
+            pessoas.forEach(p => {
+                if (!p.nascimento) return;
+                const nasc = new Date(p.nascimento);
+                let idade = hojeDate.getFullYear() - nasc.getFullYear();
+                const mes = hojeDate.getMonth() - nasc.getMonth();
+                if (mes < 0 || (mes === 0 && hojeDate.getDate() < nasc.getDate())) idade--;
+                if (idade <= 18) faixas['0-18']++;
+                else if (idade <= 30) faixas['19-30']++;
+                else if (idade <= 50) faixas['31-50']++;
+                else if (idade <= 70) faixas['51-70']++;
+                else faixas['70+']++;
+            });
+            const totalFaixa = Object.values(faixas).reduce((a, b) => a + b, 0);
+            const containerFaixa = document.getElementById('faixaEtaria');
+            if (totalFaixa === 0) {
+                containerFaixa.innerHTML = '<p class="text-muted">Sem dados de idade.</p>';
+            } else {
+                const cores = ['#2e86c1','#27ae60','#f39c12','#e67e22','#c0392b'];
+                const labels = Object.keys(faixas);
+                const values = Object.values(faixas);
+                let acum = 0;
+                const segments = labels.map((label, i) => {
+                    const percent = (values[i] / totalFaixa) * 100;
+                    const start = acum;
+                    acum += percent;
+                    return { label, percent, color: cores[i % cores.length], start };
+                });
+                const grad = segments.map(s => `${s.color} ${s.start}% ${s.start + s.percent}%`).join(', ');
+                containerFaixa.innerHTML = `
+                    <div class="donut" style="background:conic-gradient(${grad});"></div>
+                    <div class="donut-legend">
+                        ${segments.map(s => `
+                            <div class="donut-legend-item">
+                                <span class="donut-legend-color" style="background:${s.color};"></span>
+                                ${s.label} - ${values[labels.indexOf(s.label)]} (${s.percent.toFixed(1)}%)
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Últimos cadastros
+            const ultimos = pessoas.slice(-5).reverse();
+            const containerUltimos = document.getElementById('ultimosCadastros');
+            if (!ultimos.length) {
+                containerUltimos.innerHTML = 'Nenhuma pessoa cadastrada.';
+            } else {
+                containerUltimos.innerHTML = ultimos.map(p =>
+                    `<div>👤 ${p.nome} - CPF: ${p.cpf} - Renda: R$ ${p.renda.toFixed(2)}</div>`
+                ).join('');
+            }
+        }
+
+        // ============================================================
+        //  RENDERIZAÇÃO: LISTAGEM
+        // ============================================================
+        function renderListagem(filtro = 'todos', busca = '') {
+            const estados = DB.getEstados();
+            const municipios = DB.getMunicipios();
+            const bairros = DB.getBairros();
+            const pessoas = DB.getPessoas();
+            let dados = [];
+
+            if (filtro === 'uf' || filtro === 'todos') {
+                dados = dados.concat(estados.map(e => ({ tipo: 'UF', sigla: e.sigla, nome: e.nome, regiao: e.regiao || '', id: e.sigla })));
+            }
+            if (filtro === 'municipio' || filtro === 'todos') {
+                dados = dados.concat(municipios.map(m => {
+                    const uf = estados.find(e => e.sigla === m.uf);
+                    return { tipo: 'Município', nome: m.nome, uf: m.uf, ufNome: uf ? uf.nome : '', id: m.id };
+                }));
+            }
+            if (filtro === 'bairro' || filtro === 'todos') {
+                dados = dados.concat(bairros.map(b => {
+                    const mun = municipios.find(m => m.id === b.municipioId);
+                    const uf = mun ? estados.find(e => e.sigla === mun.uf) : null;
+                    return { tipo: 'Bairro', nome: b.nome, municipio: mun ? mun.nome : '?', uf: uf ? uf.sigla : '?', id: b.id };
+                }));
+            }
+            if (filtro === 'pessoa' || filtro === 'todos') {
+                dados = dados.concat(pessoas.map(p => {
+                    const bairro = bairros.find(b => b.id === p.bairroId);
+                    const mun = bairro ? municipios.find(m => m.id === bairro.municipioId) : null;
+                    return { tipo: 'Pessoa', nome: p.nome, cpf: p.cpf, renda: p.renda, uf: p.uf, municipio: mun ? mun.nome : '?', bairro: bairro ? bairro.nome : '?', id: p.id };
+                }));
+            }
+
+            if (busca.trim()) {
+                const term = busca.toLowerCase();
+                dados = dados.filter(d =>
+                    (d.nome && d.nome.toLowerCase().includes(term)) ||
+                    (d.sigla && d.sigla.toLowerCase().includes(term)) ||
+                    (d.uf && d.uf.toLowerCase().includes(term)) ||
+                    (d.cpf && d.cpf.includes(term))
+                );
+            }
+
+            const container = document.getElementById('tabelaContainer');
+            if (!dados.length) {
+                container.innerHTML = '<p class="text-muted" style="padding:16px;">Nenhum registro encontrado.</p>';
+                return;
+            }
+
+            let html = `<table><thead><tr><th>Tipo</th><th>Nome / Sigla</th><th>Detalhe</th><th>Ações</th></tr></thead><tbody>`;
+            dados.forEach(d => {
+                let detalhe = '';
+                let id = d.id;
+                let tipo = d.tipo;
+                if (tipo === 'UF') detalhe = d.regiao;
+                else if (tipo === 'Município') detalhe = d.ufNome || d.uf;
+                else if (tipo === 'Bairro') detalhe = `${d.municipio} - ${d.uf}`;
+                else if (tipo === 'Pessoa') detalhe = `CPF: ${d.cpf} | Renda: R$ ${d.renda.toFixed(2)} | ${d.bairro} - ${d.municipio}`;
+                const label = tipo === 'UF' ? d.sigla : d.nome;
+                html += `<tr>
+                    <td>${tipo}</td>
+                    <td>${label}</td>
+                    <td>${detalhe}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="excluirItem('${tipo.toLowerCase()}', '${id}')">Excluir</button></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // ============================================================
+        //  RENDERIZAÇÃO: MAPA
+        // ============================================================
+        const COORDENADAS = {
+            'AC': { x: 14, y: 18 }, 'AM': { x: 28, y: 12 }, 'RR': { x: 48, y: 6 }, 'PA': { x: 50, y: 22 },
+            'AP': { x: 58, y: 10 }, 'TO': { x: 54, y: 38 }, 'RO': { x: 20, y: 30 }, 'MA': { x: 44, y: 40 },
+            'PI': { x: 48, y: 48 }, 'CE': { x: 54, y: 44 }, 'RN': { x: 60, y: 40 }, 'PB': { x: 62, y: 48 },
+            'PE': { x: 64, y: 52 }, 'AL': { x: 66, y: 56 }, 'SE': { x: 68, y: 60 }, 'BA': { x: 58, y: 62 },
+            'MT': { x: 34, y: 46 }, 'GO': { x: 50, y: 56 }, 'MS': { x: 38, y: 64 }, 'DF': { x: 54, y: 58 },
+            'SP': { x: 58, y: 76 }, 'RJ': { x: 64, y: 78 }, 'MG': { x: 64, y: 70 }, 'ES': { x: 70, y: 72 },
+            'PR': { x: 56, y: 84 }, 'SC': { x: 60, y: 90 }, 'RS': { x: 56, y: 96 }
+        };
+
+        function renderMapa() {
+            const grid = document.getElementById('mapGrid');
+            const estados = DB.getEstados();
+            const municipios = DB.getMunicipios();
+            const bairros = DB.getBairros();
+            const pessoas = DB.getPessoas();
+
+            const cores = {
+                'Norte': '#2e86c1',
+                'Nordeste': '#27ae60',
+                'Centro-Oeste': '#f39c12',
+                'Sudeste': '#8e44ad',
+                'Sul': '#e67e22'
+            };
+            const regiaoMap = {};
+            estados.forEach(e => regiaoMap[e.sigla] = e.regiao || 'Centro-Oeste');
+
+            let html = '';
+            for (const [sigla, coord] of Object.entries(COORDENADAS)) {
+                const estado = estados.find(e => e.sigla === sigla);
+                const qtdMun = municipios.filter(m => m.uf === sigla).length;
+                const qtdBairros = bairros.filter(b => {
+                    const mun = municipios.find(m => m.id === b.municipioId);
+                    return mun && mun.uf === sigla;
+                }).length;
+                const qtdPessoas = pessoas.filter(p => p.uf === sigla).length;
+                const cor = estado ? cores[estado.regiao] || '#7f8c8d' : '#7f8c8d';
+                const nome = estado ? estado.nome : sigla;
+                html += `
+                    <button class="estado-btn" style="left:${coord.x}%; top:${coord.y}%; background:${cor};"
+                            data-uf="${sigla}">
+                        ${sigla}
+                        <span class="tooltip">
+                            <strong>${nome} (${sigla})</strong>
+                            Municípios: ${qtdMun}<br>
+                            Bairros: ${qtdBairros}<br>
+                            Pessoas: ${qtdPessoas}
+                        </span>
+                    </button>
+                `;
+            }
+            grid.innerHTML = html;
+
+            grid.querySelectorAll('.estado-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const uf = this.dataset.uf;
+                    const estado = DB.getEstados().find(e => e.sigla === uf);
+                    const qtdMun = DB.getMunicipios().filter(m => m.uf === uf).length;
+                    const qtdBairros = DB.getBairros().filter(b => {
+                        const mun = DB.getMunicipios().find(m => m.id === b.municipioId);
+                        return mun && mun.uf === uf;
+                    }).length;
+                    const qtdPessoas = DB.getPessoas().filter(p => p.uf === uf).length;
+                    const rendaTotal = DB.getPessoas().filter(p => p.uf === uf).reduce((s, p) => s + p.renda, 0);
+                    document.getElementById('mapInfo').innerHTML = `
+                        <strong>${estado ? estado.nome : uf} — ${uf}</strong><br>
+                        Municípios: ${qtdMun} &nbsp;|&nbsp; Bairros: ${qtdBairros} &nbsp;|&nbsp; Pessoas: ${qtdPessoas}<br>
+                        Renda total: R$ ${rendaTotal.toFixed(2)}
+                    `;
+                });
+            });
+        }
+
+        // ============================================================
+        //  RENDERIZAÇÃO: HIERARQUIA
+        // ============================================================
+        function renderHierarquia() {
+            const container = document.getElementById('treeContainer');
+            const estados = DB.getEstados();
+            const municipios = DB.getMunicipios();
+            const bairros = DB.getBairros();
+            const pessoas = DB.getPessoas();
+
+            if (!estados.length) {
+                container.innerHTML = '<p class="text-muted">Nenhum dado cadastrado.</p>';
+                return;
+            }
+
+            let html = '<ul>';
+            estados.forEach(uf => {
+                const qtdPessoasUF = pessoas.filter(p => p.uf === uf.sigla).length;
+                html += `<li><div class="node">🌎 <strong>${uf.sigla}</strong> — ${uf.nome} <span class="badge">${uf.regiao || ''} | ${qtdPessoasUF} pessoas</span></div>`;
+                const muns = municipios.filter(m => m.uf === uf.sigla);
+                if (muns.length) {
+                    html += '<ul>';
+                    muns.forEach(mun => {
+                        const qtdPessoasMun = pessoas.filter(p => p.municipioId === mun.id).length;
+                        html += `<li><div class="node">🏙️ ${mun.nome} <span class="badge">${bairros.filter(b => b.municipioId === mun.id).length} bairros | ${qtdPessoasMun} pessoas</span></div>`;
+                        const bairrosMun = bairros.filter(b => b.municipioId === mun.id);
+                        if (bairrosMun.length) {
+                            html += '<ul>';
+                            bairrosMun.forEach(b => {
+                                const qtdPessoasBairro = pessoas.filter(p => p.bairroId === b.id).length;
+                                html += `<li><div class="node">🏘️ ${b.nome} <span class="badge">${qtdPessoasBairro} pessoas</span></div></li>`;
+                            });
+                            html += '</ul>';
+                        }
+                        html += '</li>';
+                    });
+                    html += '</ul>';
+                }
+                html += '</li>';
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // ============================================================
+        //  ATUALIZAR SELECTS ENCADEADOS
+        // ============================================================
+        function popularSelects() {
+            const estados = DB.getEstados();
+            const selects = ['mun-uf', 'bairro-uf', 'pessoa-uf', 'exp-uf'];
+            selects.forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const current = sel.value;
+                sel.innerHTML = '<option value="">Selecione UF</option>';
+                estados.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e.sigla;
+                    opt.textContent = `${e.sigla} - ${e.nome}`;
+                    sel.appendChild(opt);
+                });
+                if (current) sel.value = current;
+            });
+            atualizarMunicipiosSelect('bairro-uf', 'bairro-mun');
+            atualizarMunicipiosSelect('pessoa-uf', 'pessoa-mun');
+            atualizarMunicipiosSelect('exp-uf', 'exp-mun');
+        }
+
+        function atualizarMunicipiosSelect(ufSelectId, munSelectId) {
+            const uf = document.getElementById(ufSelectId).value;
+            const munSel = document.getElementById(munSelectId);
+            if (!munSel) return;
+            munSel.innerHTML = '<option value="">Selecione município</option>';
+            if (!uf) return;
+            const municipios = DB.getMunicipios().filter(m => m.uf === uf);
+            municipios.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.nome;
+                munSel.appendChild(opt);
+            });
+            if (munSelectId === 'pessoa-mun') {
+                document.getElementById('pessoa-mun').dispatchEvent(new Event('change'));
+            }
+            if (munSelectId === 'exp-mun') {
+                document.getElementById('exp-mun').dispatchEvent(new Event('change'));
+            }
+        }
+
+        function atualizarBairrosSelect(munSelectId, bairroSelectId) {
+            const munId = parseInt(document.getElementById(munSelectId).value);
+            const bairroSel = document.getElementById(bairroSelectId);
+            if (!bairroSel) return;
+            bairroSel.innerHTML = '<option value="">Selecione bairro</option>';
+            if (!munId) return;
+            const bairros = DB.getBairros().filter(b => b.municipioId === munId);
+            bairros.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.id;
+                opt.textContent = b.nome;
+                bairroSel.appendChild(opt);
+            });
+        }
+
+        // ============================================================
+        //  ATUALIZAR TUDO
+        // ============================================================
+        function atualizarTudo() {
+            popularSelects();
+            renderDashboard();
+            renderListagem(document.getElementById('filterTipo').value, document.getElementById('searchInput').value);
+            renderMapa();
+            renderHierarquia();
+            document.getElementById('exp-uf').dispatchEvent(new Event('change'));
+        }
+
+        // ============================================================
+        //  TEMA
+        // ============================================================
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                document.body.classList.add('dark');
+                document.getElementById('themeLabel').textContent = 'Escuro';
+            } else {
+                document.body.classList.remove('dark');
+                document.getElementById('themeLabel').textContent = 'Claro';
+            }
+            localStorage.setItem('theme', theme);
+        }
+        function toggleTheme() {
+            const isDark = document.body.classList.contains('dark');
+            setTheme(isDark ? 'light' : 'dark');
+        }
+
+        // ============================================================
+        //  SIDEBAR MOBILE
+        // ============================================================
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('show');
+        }
+
+        // ============================================================
+        //  NAVEGAÇÃO
+        // ============================================================
+        function navigateTo(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.remove('active'));
+            document.querySelector(`#sidebar nav a[data-page="${pageId}"]`).classList.add('active');
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('overlay').classList.remove('open');
+        }
+
+        // ============================================================
+        //  PERFIL (localStorage)
+        // ============================================================
+        function carregarPerfil() {
+            const perfil = JSON.parse(localStorage.getItem('perfil')) || {
+                nome: 'Admin',
+                email: 'admin@geocadastro.com'
+            };
+            document.getElementById('perfilNome').textContent = perfil.nome;
+            document.getElementById('perfilEmail').textContent = perfil.email;
+            document.getElementById('perfilEditNome').value = perfil.nome;
+            document.getElementById('perfilEditEmail').value = perfil.email;
+            return perfil;
+        }
+
+        function salvarPerfil(nome, email, senha) {
+            const perfil = { nome, email };
+            if (senha && senha.trim() !== '') {
+                perfil.senha = senha; // em produção, hash
+            }
+            localStorage.setItem('perfil', JSON.stringify(perfil));
+            carregarPerfil();
+            showToast('✅ Perfil atualizado com sucesso!');
+        }
+
+        // ============================================================
+        //  MODAL PERFIL
+        // ============================================================
+        function abrirModalPerfil() {
+            const perfil = JSON.parse(localStorage.getItem('perfil')) || { nome: 'Admin', email: 'admin@geocadastro.com' };
+            document.getElementById('perfilEditNome').value = perfil.nome;
+            document.getElementById('perfilEditEmail').value = perfil.email;
+            document.getElementById('perfilEditSenha').value = '';
+            document.getElementById('modalPerfil').classList.add('show');
+        }
+
+        function fecharModalPerfil() {
+            document.getElementById('modalPerfil').classList.remove('show');
+        }
+
+        // ============================================================
+        //  EXPORTAÇÃO
+        // ============================================================
+        function getDadosFiltrados() {
+            const uf = document.getElementById('exp-uf').value;
+            const munId = parseInt(document.getElementById('exp-mun').value);
+            const bairroId = parseInt(document.getElementById('exp-bairro').value);
+            let pessoas = DB.getPessoas();
+            if (uf) pessoas = pessoas.filter(p => p.uf === uf);
+            if (munId) pessoas = pessoas.filter(p => p.municipioId === munId);
+            if (bairroId) pessoas = pessoas.filter(p => p.bairroId === bairroId);
+            return pessoas;
+        }
+
+        function exportarExcel() {
+            const dados = getDadosFiltrados();
+            if (!dados.length) { showToast('Nenhum dado para exportar.', 'error'); return; }
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(dados.map(p => ({
+                Nome: p.nome, CPF: p.cpf, Email: p.email, Sexo: p.sexo,
+                Nascimento: p.nascimento, Renda: p.renda, UF: p.uf,
+                Logradouro: p.logradouro, Numero: p.numero, Complemento: p.complemento
+            })));
+            XLSX.utils.book_append_sheet(wb, ws, 'Pessoas');
+            XLSX.writeFile(wb, 'geocadastro_export.xlsx');
+            showToast('📊 Excel exportado com sucesso!');
+        }
+
+        function exportarPDF() {
+            const dados = getDadosFiltrados();
+            if (!dados.length) { showToast('Nenhum dado para exportar.', 'error'); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape', 'mm', 'a4');
+            doc.setFont('helvetica');
+            doc.setFontSize(16);
+            doc.text('Relatorio GeoCadastro', 14, 22);
+            doc.setFontSize(10);
+            doc.text('Gerado em: ' + new Date().toLocaleString('pt-BR'), 14, 30);
+            doc.text('Total de registros: ' + dados.length, 14, 36);
+            const headers = [['Nome', 'CPF', 'UF', 'Renda', 'Logradouro']];
+            const rows = dados.map(p => [p.nome, p.cpf, p.uf, 'R$ ' + p.renda.toFixed(2).replace('.', ','), p.logradouro || '']);
+            doc.autoTable({
+                head: headers,
+                body: rows,
+                startY: 42,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [44, 62, 143] }
+            });
+            doc.save('geocadastro_relatorio.pdf');
+            showToast('PDF exportado com sucesso!');
+        }
+
+        function exportarCSV() {
+            const dados = getDadosFiltrados();
+            if (!dados.length) { showToast('Nenhum dado para exportar.', 'error'); return; }
+            const headers = ['Nome','CPF','Email','Sexo','Nascimento','Renda','UF','Logradouro','Numero','Complemento'];
+            const rows = dados.map(p => headers.map(h => p[h.toLowerCase()] || '').join(';'));
+            const csv = [headers.join(';'), ...rows].join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'geocadastro_export.csv';
+            link.click();
+            showToast('📑 CSV exportado com sucesso!');
+        }
+
+        function exportarJSON() {
+            const dados = getDadosFiltrados();
+            if (!dados.length) { showToast('Nenhum dado para exportar.', 'error'); return; }
+            const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'geocadastro_export.json';
+            link.click();
+            showToast('🔗 JSON exportado com sucesso!');
+        }
+
+        function imprimir() {
+            const dados = getDadosFiltrados();
+            if (!dados.length) { showToast('Nenhum dado para imprimir.', 'error'); return; }
+            const win = window.open('', '_blank');
+            win.document.write(`
+                <html><head><title>Relatorio GeoCadastro</title>
+                <style>body{font-family:'Segoe UI',sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;}
+                th{background:#2c3e8f;color:#fff;padding:8px;}td{padding:6px;border-bottom:1px solid #ddd;}</style>
+                </head><body><h2>Relatorio GeoCadastro</h2><p>Total: ${dados.length} registros</p>
+                <table><thead><tr><th>Nome</th><th>CPF</th><th>UF</th><th>Renda</th><th>Endereco</th></tr></thead><tbody>
+            `);
+            dados.forEach(p => {
+                win.document.write(`<tr><td>${p.nome}</td><td>${p.cpf}</td><td>${p.uf}</td><td>R$ ${p.renda.toFixed(2)}</td><td>${p.logradouro || ''}, ${p.numero || ''} ${p.complemento || ''}</td></tr>`);
+            });
+            win.document.write('</tbody></table></body></html>');
+            win.document.close();
+            win.print();
+            showToast('🖨️ Impressão enviada.');
+        }
+
+        // ============================================================
+        //  IMPORTAÇÃO
+        // ============================================================
+        function importarDados(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let dados = [];
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    if (ext === 'json') {
+                        dados = JSON.parse(e.target.result);
+                    } else if (ext === 'csv') {
+                        const lines = e.target.result.split('\n').filter(line => line.trim());
+                        const headers = lines[0].split(';').map(h => h.trim());
+                        dados = lines.slice(1).map(line => {
+                            const values = line.split(';').map(v => v.trim());
+                            const obj = {};
+                            headers.forEach((h, i) => obj[h.toLowerCase()] = values[i] || '');
+                            return obj;
+                        });
+                    } else if (ext === 'xlsx') {
+                        const workbook = XLSX.read(e.target.result, { type: 'array' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        dados = XLSX.utils.sheet_to_json(sheet);
+                    } else {
+                        showToast('Formato não suportado.', 'error');
+                        return;
+                    }
+                    const pessoas = dados.map(item => ({
+                        nome: item.nome || item.Nome || '',
+                        cpf: item.cpf || item.CPF || '',
+                        email: item.email || item.Email || '',
+                        sexo: item.sexo || item.Sexo || '',
+                        nascimento: item.nascimento || item.Nascimento || '',
+                        renda: parseFloat(item.renda || item.Renda || 0),
+                        uf: item.uf || item.UF || '',
+                        municipioId: parseInt(item.municipioId || item.MunicipioId || 0),
+                        bairroId: parseInt(item.bairroId || item.BairroId || 0),
+                        logradouro: item.logradouro || item.Logradouro || '',
+                        numero: item.numero || item.Numero || '',
+                        complemento: item.complemento || item.Complemento || '',
+                        dataCadastro: new Date().toISOString().split('T')[0]
+                    }));
+                    const validos = pessoas.filter(p => p.nome && p.cpf && p.uf);
+                    if (!validos.length) {
+                        showToast('Nenhum registro válido encontrado.', 'error');
+                        return;
+                    }
+                    const existentes = DB.getPessoas();
+                    const novos = validos.filter(p => !existentes.some(e => e.cpf === p.cpf));
+                    DB.setPessoas([...existentes, ...novos]);
+                    showToast(`✅ ${novos.length} registros importados com sucesso! (${validos.length - novos.length} duplicados ignorados)`);
+                    atualizarTudo();
+                } catch (err) {
+                    showToast('Erro ao importar: ' + err.message, 'error');
+                }
+            };
+            if (file.name.endsWith('.xlsx')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+        }
+
+        // ============================================================
+        //  RELATÓRIOS AUTOMÁTICOS (CORRIGIDO - TODOS OS TIPOS)
+        // ============================================================
+        function gerarRelatorio(tipo) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape', 'mm', 'a4');
+            const pessoas = DB.getPessoas();
+            const estados = DB.getEstados();
+            const municipios = DB.getMunicipios();
+            const bairros = DB.getBairros();
+
+            let titulo = '';
+            let dados = [];
+
+            switch (tipo) {
+                case 'geral':
+                    titulo = 'Geral';
+                    dados = pessoas.map(p => ({
+                        Nome: p.nome,
+                        CPF: p.cpf,
+                        UF: p.uf,
+                        Renda: 'R$ ' + p.renda.toFixed(2).replace('.', ','),
+                        Logradouro: p.logradouro || ''
+                    }));
+                    break;
+                case 'uf': {
+                    titulo = 'por UF';
+                    const grupos = {};
+                    estados.forEach(e => grupos[e.sigla] = { nome: e.nome, count: 0, renda: 0 });
+                    pessoas.forEach(p => {
+                        if (grupos[p.uf]) { grupos[p.uf].count++; grupos[p.uf].renda += p.renda; }
+                    });
+                    dados = Object.entries(grupos).map(([uf, info]) => ({
+                        UF: uf,
+                        Nome: info.nome,
+                        Pessoas: info.count,
+                        'Renda Media': info.count ? 'R$ ' + (info.renda / info.count).toFixed(2).replace('.', ',') : 'R$ 0,00'
+                    }));
+                    break;
+                }
+                case 'municipio': {
+                    titulo = 'por Municipio';
+                    const grupos = {};
+                    municipios.forEach(m => grupos[m.id] = { nome: m.nome, uf: m.uf, count: 0, renda: 0 });
+                    pessoas.forEach(p => {
+                        if (grupos[p.municipioId]) { grupos[p.municipioId].count++; grupos[p.municipioId].renda += p.renda; }
+                    });
+                    dados = Object.entries(grupos).map(([id, info]) => ({
+                        Municipio: info.nome,
+                        UF: info.uf,
+                        Pessoas: info.count,
+                        'Renda Media': info.count ? 'R$ ' + (info.renda / info.count).toFixed(2).replace('.', ',') : 'R$ 0,00'
+                    }));
+                    break;
+                }
+                case 'bairro': {
+                    titulo = 'por Bairro';
+                    const grupos = {};
+                    bairros.forEach(b => grupos[b.id] = { nome: b.nome, municipioId: b.municipioId, count: 0, renda: 0 });
+                    pessoas.forEach(p => {
+                        if (grupos[p.bairroId]) { grupos[p.bairroId].count++; grupos[p.bairroId].renda += p.renda; }
+                    });
+                    dados = Object.entries(grupos).map(([id, info]) => {
+                        const mun = municipios.find(m => m.id === info.municipioId);
+                        return {
+                            Bairro: info.nome,
+                            Municipio: mun ? mun.nome : '?',
+                            Pessoas: info.count,
+                            'Renda Media': info.count ? 'R$ ' + (info.renda / info.count).toFixed(2).replace('.', ',') : 'R$ 0,00'
+                        };
+                    });
+                    break;
+                }
+                case 'demografico': {
+                    titulo = 'Demografico';
+                    const faixas = { '0-18': 0, '19-30': 0, '31-50': 0, '51-70': 0, '70+': 0 };
+                    const hoje = new Date();
+                    pessoas.forEach(p => {
+                        if (!p.nascimento) return;
+                        const nasc = new Date(p.nascimento);
+                        let idade = hoje.getFullYear() - nasc.getFullYear();
+                        const mes = hoje.getMonth() - nasc.getMonth();
+                        if (mes < 0 || (mes === 0 && hoje.getDate() < nasc.getDate())) idade--;
+                        if (idade <= 18) faixas['0-18']++;
+                        else if (idade <= 30) faixas['19-30']++;
+                        else if (idade <= 50) faixas['31-50']++;
+                        else if (idade <= 70) faixas['51-70']++;
+                        else faixas['70+']++;
+                    });
+                    dados = Object.entries(faixas).map(([faixa, count]) => ({
+                        'Faixa Etaria': faixa,
+                        Pessoas: count
+                    }));
+                    break;
+                }
+                case 'renda': {
+                    titulo = 'de Renda';
+                    const grupos = {};
+                    estados.forEach(e => grupos[e.sigla] = { soma: 0, count: 0 });
+                    pessoas.forEach(p => {
+                        if (grupos[p.uf]) { grupos[p.uf].soma += p.renda; grupos[p.uf].count++; }
+                    });
+                    dados = Object.entries(grupos).map(([uf, info]) => ({
+                        UF: uf,
+                        Pessoas: info.count,
+                        'Renda Total': 'R$ ' + info.soma.toFixed(2).replace('.', ','),
+                        'Renda Media': info.count ? 'R$ ' + (info.soma / info.count).toFixed(2).replace('.', ',') : 'R$ 0,00'
+                    }));
+                    break;
+                }
+                case 'mensal': {
+                    titulo = 'Mensal';
+                    const meses = {};
+                    pessoas.forEach(p => {
+                        if (p.dataCadastro) {
+                            const mes = p.dataCadastro.substring(0,7);
+                            meses[mes] = (meses[mes] || 0) + 1;
+                        }
+                    });
+                    dados = Object.entries(meses).map(([mes, count]) => ({
+                        Mes: mes,
+                        Cadastros: count
+                    }));
+                    break;
+                }
+                default:
+                    titulo = 'Geral';
+                    dados = pessoas.map(p => ({
+                        Nome: p.nome,
+                        CPF: p.cpf,
+                        UF: p.uf,
+                        Renda: 'R$ ' + p.renda.toFixed(2).replace('.', ','),
+                        Logradouro: p.logradouro || ''
+                    }));
+            }
+
+            if (!dados.length) {
+                showToast('Nenhum dado para gerar relatorio.', 'error');
+                return;
+            }
+
+            doc.setFont('helvetica');
+            doc.setFontSize(16);
+            doc.text('Relatorio ' + titulo, 14, 22);
+            doc.setFontSize(10);
+            doc.text('Gerado em: ' + new Date().toLocaleString('pt-BR'), 14, 30);
+
+            const headers = Object.keys(dados[0]);
+            const rows = dados.map(item => headers.map(h => item[h] || ''));
+
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+                startY: 38,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [44, 62, 143] }
+            });
+
+            doc.save('relatorio_' + tipo + '.pdf');
+            showToast('Relatorio ' + titulo + ' gerado com sucesso!');
+        }
+
+        // ============================================================
+        //  EASTER EGG
+        // ============================================================
+        let eggCount = 0;
+        document.getElementById('logoEgg').addEventListener('click', function() {
+            eggCount++;
+            if (eggCount >= 5) {
+                eggCount = 0;
+                document.getElementById('eggContainer').classList.add('show');
+            }
+        });
+        document.getElementById('closeEgg').addEventListener('click', function() {
+            document.getElementById('eggContainer').classList.remove('show');
+        });
+        document.getElementById('eggContainer').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('show');
+        });
+
+        // ============================================================
+        //  INICIALIZAÇÃO
+        // ============================================================
+        function init() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+            carregarPerfil();
+
+            // Eventos de salvamento
+            document.getElementById('btnSalvarUF').addEventListener('click', salvarUF);
+            document.getElementById('btnSalvarMunicipio').addEventListener('click', salvarMunicipio);
+            document.getElementById('btnSalvarBairro').addEventListener('click', salvarBairro);
+            document.getElementById('btnSalvarPessoa').addEventListener('click', salvarPessoa);
+
+            // Navegação
+            document.querySelectorAll('#sidebar nav a').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    navigateTo(this.dataset.page);
+                });
+            });
+
+            // Hamburger
+            document.getElementById('hamburger').addEventListener('click', toggleSidebar);
+            document.getElementById('overlay').addEventListener('click', toggleSidebar);
+
+            // Tema
+            document.getElementById('switchBtn').addEventListener('click', toggleTheme);
+            document.getElementById('btnTemaClaro').addEventListener('click', () => setTheme('light'));
+            document.getElementById('btnTemaEscuro').addEventListener('click', () => setTheme('dark'));
+
+            // Listagem
+            document.getElementById('btnListarTodos').addEventListener('click', () => {
+                document.getElementById('searchInput').value = '';
+                document.getElementById('filterTipo').value = 'todos';
+                renderListagem('todos', '');
+            });
+            document.getElementById('searchInput').addEventListener('input', function() {
+                renderListagem(document.getElementById('filterTipo').value, this.value);
+            });
+            document.getElementById('filterTipo').addEventListener('change', function() {
+                renderListagem(this.value, document.getElementById('searchInput').value);
+            });
+
+            // Configurações
+            document.getElementById('btnLimparDados').addEventListener('click', function() {
+                if (!confirm('Tem certeza que deseja apagar todos os dados?')) return;
+                localStorage.removeItem('estados');
+                localStorage.removeItem('municipios');
+                localStorage.removeItem('bairros');
+                localStorage.removeItem('pessoas');
+                showToast('🗑️ Dados limpos.');
+                atualizarTudo();
+            });
+            document.getElementById('btnExportarJSON').addEventListener('click', function() {
+                const data = {
+                    estados: DB.getEstados(),
+                    municipios: DB.getMunicipios(),
+                    bairros: DB.getBairros(),
+                    pessoas: DB.getPessoas()
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'geocadastro_backup.json';
+                link.click();
+                showToast('📥 Backup exportado!');
+            });
+            document.getElementById('btnImportarJSON').addEventListener('click', function() {
+                document.getElementById('fileInput').click();
+            });
+            document.getElementById('fileInput').addEventListener('change', function(e) {
+                if (this.files.length) {
+                    const file = this.files[0];
+                    if (file.name.endsWith('.json')) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            try {
+                                const data = JSON.parse(e.target.result);
+                                if (data.estados) DB.setEstados(data.estados);
+                                if (data.municipios) DB.setMunicipios(data.municipios);
+                                if (data.bairros) DB.setBairros(data.bairros);
+                                if (data.pessoas) DB.setPessoas(data.pessoas);
+                                showToast('📤 Backup importado!');
+                                atualizarTudo();
+                            } catch (err) { showToast('Erro ao importar.', 'error'); }
+                        };
+                        reader.readAsText(file);
+                    } else {
+                        showToast('Formato não suportado. Use JSON.', 'error');
+                    }
+                    this.value = '';
+                }
+            });
+
+            // Selects encadeados
+            document.getElementById('bairro-uf').addEventListener('change', function() {
+                atualizarMunicipiosSelect('bairro-uf', 'bairro-mun');
+            });
+            document.getElementById('pessoa-uf').addEventListener('change', function() {
+                atualizarMunicipiosSelect('pessoa-uf', 'pessoa-mun');
+            });
+            document.getElementById('pessoa-mun').addEventListener('change', function() {
+                atualizarBairrosSelect('pessoa-mun', 'pessoa-bairro');
+            });
+            document.getElementById('exp-uf').addEventListener('change', function() {
+                atualizarMunicipiosSelect('exp-uf', 'exp-mun');
+            });
+            document.getElementById('exp-mun').addEventListener('change', function() {
+                atualizarBairrosSelect('exp-mun', 'exp-bairro');
+            });
+
+            // Exportação
+            document.getElementById('expExcel').addEventListener('click', exportarExcel);
+            document.getElementById('expPDF').addEventListener('click', exportarPDF);
+            document.getElementById('expCSV').addEventListener('click', exportarCSV);
+            document.getElementById('expJSON').addEventListener('click', exportarJSON);
+            document.getElementById('expPrint').addEventListener('click', imprimir);
+
+            // Importação
+            const dropZone = document.getElementById('dropZone');
+            dropZone.addEventListener('click', () => document.getElementById('fileInput').click());
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length) {
+                    const file = files[0];
+                    if (file.name.endsWith('.xlsx') || file.name.endsWith('.csv') || file.name.endsWith('.json')) {
+                        importarDados(file);
+                    } else {
+                        showToast('Formato não suportado.', 'error');
+                    }
+                }
+            });
+            document.getElementById('fileInput').addEventListener('change', function(e) {
+                if (this.files.length) {
+                    importarDados(this.files[0]);
+                    this.value = '';
+                }
+            });
+
+            // Relatórios
+            document.querySelectorAll('[data-rel]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    gerarRelatorio(this.dataset.rel);
+                });
+            });
+
+            // Modal perfil
+            document.getElementById('btnEditarPerfil').addEventListener('click', abrirModalPerfil);
+            document.getElementById('modalPerfilClose').addEventListener('click', fecharModalPerfil);
+            document.getElementById('modalPerfilCancel').addEventListener('click', fecharModalPerfil);
+            document.getElementById('modalPerfil').addEventListener('click', function(e) {
+                if (e.target === this) fecharModalPerfil();
+            });
+            document.getElementById('modalPerfilSave').addEventListener('click', function() {
+                const nome = document.getElementById('perfilEditNome').value.trim();
+                const email = document.getElementById('perfilEditEmail').value.trim();
+                const senha = document.getElementById('perfilEditSenha').value;
+                if (!nome || !email) {
+                    showToast('❌ Preencha nome e email.', 'error');
+                    return;
+                }
+                salvarPerfil(nome, email, senha);
+                fecharModalPerfil();
+            });
+
+            // Inicializar
+            atualizarTudo();
+            navigateTo('dashboard');
+            showToast('🌎 GeoCadastro IBGE carregado!', 'success');
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
